@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Inferno - Slim</title>
+    <style>
+        body { margin:0; background:#0b1d12; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; overflow:hidden; color:#fff; user-select:none; }
+        #view { position:relative; width:800px; height:450px; background:radial-gradient(#142c1e,#0b1d12); border:4px solid #2e4d3a; overflow:hidden; perspective:500px; }
+        .w3d { position:absolute; width:100%; height:100%; transform-style:preserve-3d; transform:rotateX(40deg) translateY(-80px) translateZ(-150px); }
+        .g3d { position:absolute; width:1600px; height:900px; background:repeating-linear-gradient(90deg,#142c1e 0,#142c1e 38px,#224c33 40px),repeating-linear-gradient(0deg,#142c1e 0,#142c1e 38px,#224c33 40px); left:-400px; top:-100px; border:10px solid #2e4d3a; }
+        .obj { position:absolute; transform-style:preserve-3d; }
+        .cb { position:absolute; width:calc(var(--w)*1px); height:calc(var(--h)*1px); transform-style:preserve-3d; }
+        .cb div { position:absolute; box-sizing:border-box; border:1.5px solid rgba(255,255,255,.25); }
+        .f { width:calc(var(--w)*1px); height:calc(var(--h)*1px); transform:translateZ(calc(var(--d)*.5px)); }
+        .bk { width:calc(var(--w)*1px); height:calc(var(--h)*1px); transform:rotateY(180deg) translateZ(calc(var(--d)*.5px)); }
+        .l, .r { width:calc(var(--d)*1px); height:calc(var(--h)*1px); transform:rotateY(var(--ay)) translateZ(calc(var(--w)*.5px)); left:calc(var(--w)*.5px - var(--d)*.5px); }
+        .t, .b { width:calc(var(--w)*1px); height:calc(var(--d)*1px); transform:rotateX(var(--ax)) translateZ(calc(var(--h)*.5px)); top:calc(var(--h)*.5px - var(--d)*.5px); }
+        .ps div { background:rgba(46,184,114,.85); box-shadow:inset 0 0 15px #00f; }
+        .ss div { background:rgba(255,235,59,.9); box-shadow:0 0 12px #ffeb3b; border:none; }
+        .es div { background:rgba(201,75,75,.85); box-shadow:inset 0 0 15px #6d1b1b; }
+        .em div { background:rgba(217,138,43,.85); box-shadow:inset 0 0 15px #7a460b; }
+        .eb div { background:rgba(90,105,117,.9); box-shadow:inset 0 0 30px #242c33; }
+        .cs div { background:rgba(0,188,212,.6); box-shadow:inset 0 0 20px #00bcd4; }
+        .hp2d { position:absolute; top:-12px; left:0; height:4px; background:#f33; pointer-events:none; z-index:10; }
+        .hud { position:absolute; top:0; width:100%; padding:15px; box-sizing:border-box; display:flex; justify-content:space-between; font-weight:bold; pointer-events:none; }
+        .hc { width:150px; height:12px; border:2px solid #2e4d3a; background:#11251a; margin-top:4px; }
+        .hf { height:100%; width:100%; background:#2eb872; transition:width .1s; }
+        .tx { position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); font-size:36px; font-weight:bold; display:none; }
+    </style>
+</head>
+<body>
+    <div id="view">
+        <div class="w3d">
+            <div class="g3d"></div>
+            <div id="ent" style="transform-style:preserve-3d; position:absolute; width:100%; height:100%;">
+                <div id="po" class="obj"><div class="cb ps" style="--w:32;--h:48;--d:32;"><div class="f"></div><div class="bk"></div><div class="l" style="--ay:-90deg"></div><div class="r" style="--ay:90deg"></div><div class="t" style="--ax:90deg"></div><div class="b" style="--ax:-90deg"></div></div>
+                    <div id="so" class="obj" style="display:none;"><div class="cb ss" style="--w:40;--h:16;--d:12;"><div class="f"></div><div class="bk"></div><div class="l" style="--ay:-90deg"></div><div class="r" style="--ay:90deg"></div><div class="t" style="--ax:90deg"></div><div class="b" style="--ax:-90deg"></div></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="hud">
+            <div><div id="lbl">STAGE 1</div><div>PLAYER HP</div><div class="hc"><div id="ph" class="hf"></div></div></div>
+            <div style="text-align:right; color:#f33; font-size:12px;">⚠️ INFERNO MODE<div id="inf" style="color:#8fae99; font-size:11px;"></div></div>
+        </div>
+        <div id="msg" class="tx"></div>
+    </div>
+<script>
+    const ent=document.getElementById("ent"), po=document.getElementById("po"), so=document.getElementById("so"), lbl=document.getElementById("lbl"), inf=document.getElementById("inf"), ph=document.getElementById("ph"), msg=document.getElementById("msg");
+    let stage=1, state='intro', time=90, enemies=[], crystals=[], keys={};
+    const p={ x:200, y:250, w:32, h:48, s:4.5, hp:5, iv:0, at:0, dir:'right' }, stg = {
+        1: { t:"STAGE 1 (HARD)", s:"超高速・高耐久の雑魚の群れ", c:[{x:150,y:120,w:30,h:60,d:30},{x:400,y:280,w:35,h:70,d:35}], e:[{t:'zk',x:500,y:150,w:22,h:32,d:22,hp:6,s:2.8,c:'es'},{t:'zk',x:560,y:300,w:22,h:32,d:22,hp:6,s:2.8,c:'es'},{t:'zk',x:650,y:190,w:22,h:32,d:22,hp:6,s:2.8,c:'es'},{t:'zk',x:700,y:260,w:22,h:32,d:22,hp:6,s:2.8,c:'es'}], b:{x:650,y:200,w:60,h:78,d:60,hp:35,s:2,c:'eb'} },
+        2: { t:"STAGE 2 (NIGHTMARE)", s:"執拗な超高速追跡＋鉄壁のラスボス", c:[{x:200,y:150,w:30,h:60,d:30},{x:350,y:280,w:30,h:60,d:30},{x:550,y:130,w:35,h:70,d:35}], e:[{t:'zk',x:450,y:300,w:22,h:32,d:22,hp:10,s:3.4,c:'es'},{t:'md',x:520,y:120,w:32,h:44,d:32,hp:20,s:2.4,c:'em'},{t:'md',x:600,y:280,w:32,h:44,d:32,hp:20,s:2.4,c:'em'},{t:'md',x:400,y:100,w:32,h:44,d:32,hp:20,s:2.4,c:'em'}], b:{x:680,y:180,w:75,h:90,d:75,hp:75,s:2.6,c:'eb'} }
+    };
+    window.onkeydown = e => { keys[e.key.toLowerCase()]=true; if(e.key===" ") { keys.sp=true; e.preventDefault(); } };
+    window.onkeyup = e => { keys[e.key.toLowerCase()]=false; if(e.key===" ") keys.sp=false; };
+
+    function setup(n) {
+        stage=n; const c=stg[n]; lbl.textContent=c.t; inf.textContent=c.s;
+        document.querySelectorAll('.d-obj').forEach(el=>el.remove()); enemies=[]; crystals=[];
+        c.c.forEach(i => {
+            const el=document.createElement("div"); el.className="obj d-obj"; el.innerHTML=`<div class="cb cs" style="--w:${i.w};--h:${i.h};--d:${i.d};"><div class="f"></div><div class="bk"></div><div class="l" style="--ay:-90deg"></div><div class="r" style="--ay:90deg"></div><div class="t" style="--ax:90deg"></div><div class="b" style="--ax:-90deg"></div></div>`;
+            ent.appendChild(el); i.el=el; crystals.push(i);
+        });
+        c.e.concat({t:'boss',...c.b}).forEach(i => {
+            const el=document.createElement("div"); el.className="obj d-obj"; el.innerHTML=`<div class="hp2d" style="width:${i.w}px"></div><div class="cb ${i.c}" style="--w:${i.w};--h:${i.h};--d:${i.d};"><div class="f"></div><div class="bk"></div><div class="l" style="--ay:-90deg"></div><div class="r" style="--ay:90deg"></div><div class="t" style="--ax:90deg"></div><div class="b" style="--ax:-90deg"></div></div>`;
+            ent.appendChild(el); enemies.push({...i, el:el, hb:el.querySelector('.hp2d'), mHp:i.hp, kb:0, kbd:0});
+        });
+        p.x=100; p.y=200; p.hp=5; p.at=0; p.iv=30; state='intro'; time=90; msg.style.display="block"; msg.style.color="#f33"; msg.textContent=c.t;
+    }
+    function hit(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
+
+    (function loop() {
+        if (state==='intro') { if(--time<=0){ state='playing'; msg.style.display="none"; } }
+        else if (state==='playing') {
+            let nx=p.x, ny=p.y;
+            if(keys.arrowup||keys.w) ny-=p.s; if(keys.arrowdown||keys.s) ny+=p.s;
+            if(keys.arrowleft||keys.a){ nx-=p.s; p.dir='left'; } if(keys.arrowright||keys.d){ nx+=p.s; p.dir='right'; }
+            if(keys.sp && p.at===0) p.at=15;
+            nx=Math.max(20,Math.min(740,nx)); ny=Math.max(60,Math.min(380,ny));
+            let cx=false, cy=false;
+            crystals.forEach(c => { if(hit({x:nx,y:p.y,w:p.w,h:p.h},c)) cx=true; if(hit({x:p.x,y:ny,w:p.w,h:p.h},c)) cy=true; });
+            if(!cx) p.x=nx; if(!cy) p.y=ny;
+            if (p.at>0) {
+                p.at--; p.sw={ x:p.dir==='right'?p.x+p.w:p.x-40, y:p.y+10, w:40, h:25 };
+                enemies.forEach(en => { if(hit(p.sw,en)){ en.hp-=.15; en.kb=6; en.kbd=p.dir==='right'?1:-1; en.hb.style.width=`${Math.max(0,(en.hp/en.mHp)*en.w)}px`; } });
+            } else p.sw=null;
+            if(p.iv>0) p.iv--;
+            enemies.forEach((en,i) => {
+                if(en.kb>0){ en.x+=en.kbd*5; en.kb--; } 
+                else { let dx=p.x-en.x, dy=p.y-en.y; if(Math.abs(dx)>5) en.x+=dx>0?en.s:-en.s; if(Math.abs(dy)>5) en.y+=dy>0?en.s:-en.s; }
+                en.x=Math.max(10,Math.min(750,en.x));
+                if(p.iv===0 && hit(p,en)){ p.hp--; p.iv=40; if(p.hp<=0){ state='gameover'; msg.style.display="block"; msg.style.color="#f00"; msg.textContent="GAME OVER"; } }
+                if(en.hp<=0){ en.el.remove(); enemies.splice(i,1); }
+            });
+            if (enemies.length===0) {
+                if(stage===1){ state='stageclear'; setTimeout(()=>setup(2),2000); msg.style.display="block"; msg.style.color="#0f0"; msg.textContent="STAGE CLEAR"; }
+                else { state='victory'; msg.style.display="block"; msg.style.color="#0ff"; msg.textContent="ALL CLEAR!"; }
+            }
+        }
+        po.style.transform=`translate3d(${p.x}px,${p.y}px,0)`;
+        if(p.sw){ so.style.display="block"; so.style.transform=`translate3d(${p.dir==='right'?p.w:-30}px,12px,8px) rotateY(${p.dir==='right'?0:180}deg)`; }else so.style.display="none";
+        crystals.forEach(c=>c.el.style.transform=`translate3d(${c.x}px,${c.y}px,0)`);
+        enemies.forEach(en => { en.el.style.transform=`translate3d(${en.x}px,${en.y}px,${en.t==='boss'?10+Math.sin(Date.now()/200)*4:0}px)`; });
+        ph.style.width=`${(p.hp/5)*100}%`; requestAnimationFrame(loop);
+    })();
+    setup(1);
+</script>
+</body>
+</html>
